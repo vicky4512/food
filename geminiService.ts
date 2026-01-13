@@ -100,25 +100,27 @@ export const transmuteRecipe = async (
   return JSON.parse(response.text || "{}");
 };
 
+// --- 使用 OpenAI DALL-E 3 產生圖片 ---
 export const generateRecipeImage = async (
   recipeTitle: string, 
   description: string,
   mode: AlchemyMode = AlchemyMode.GOURMET
 ): Promise<string> => {
   
-  // 根據模式設定 Prompt 風格，保留暗黑煉金的特色
-  let stylePrompt = "Style: High-end culinary magazine, 8k resolution, delicious, dramatic lighting.";
-  
+  // 為了保留暗黑煉金的特色，我們還是根據模式微調一下風格描述
+  let styleDescription = "High-end culinary magazine, 8k resolution, delicious, dramatic lighting";
   if (mode === AlchemyMode.DARK_ARTS) {
-    stylePrompt = "Style: Hyper-realistic biological horror food photography. Visceral, slimy, neon toxic lighting. Eldritch aesthetic. Looks unsettling and gross but high quality.";
+    styleDescription = "Hyper-realistic biological horror food, visceral, slimy textures, neon toxic lighting, eldritch aesthetic, unsettling but high quality";
   } else if (mode === AlchemyMode.SURVIVAL) {
-    stylePrompt = "Style: Documentary style, messy home cooking, warm lighting, realistic textures, comfort food.";
+    styleDescription = "Documentary style, messy home cooking, warm lighting, realistic textures, comfort food";
   }
 
-  const prompt = `A professional food photography of "${recipeTitle}". Context: ${description}. ${stylePrompt}`;
+  const prompt = `A professional food photography of "${recipeTitle}". 
+  Context: ${description}. 
+  Style: ${styleDescription}.`;
 
   try {
-    console.log("Generating image with OpenAI DALL-E 3...");
+    // 呼叫 OpenAI DALL-E 3
     const response = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
@@ -140,14 +142,13 @@ export const generateRecipeImage = async (
     
     if (data.error) {
       console.error("OpenAI Error:", data.error);
-      // 如果 OpenAI 失敗 (例如 Key 設定錯誤)，為了不讓 App 壞掉，回傳空字串或考慮 fallback
       return "";
     }
 
     if (data.data && data.data[0] && data.data[0].b64_json) {
-       return `data:image/png;base64,${data.data[0].b64_json}`;
+      return `data:image/png;base64,${data.data[0].b64_json}`;
     }
-    
+
     return "";
 
   } catch (error) {
