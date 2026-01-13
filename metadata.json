@@ -1,0 +1,7 @@
+{
+  "name": "Fridge Alchemist (冰箱鍊金術師)",
+  "description": "An AI-powered magical kitchen assistant that transforms your leftover fridge ingredients into gourmet recipes using computer vision and creative alchemy.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
