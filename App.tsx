@@ -108,7 +108,7 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, step: 'TRANSMUTING' }));
     try {
       const recipe = await transmuteRecipe(state.detectedIngredients, state.selectedMode);
-      const recipeImage = await generateRecipeImage(recipe.title, recipe.description);
+      const recipeImage = await generateRecipeImage(recipe.title, recipe.description, state.selectedMode);
       setState(prev => ({ ...prev, recipe, recipeImage, step: 'RESULT' }));
     } catch (err) {
       setState(prev => ({ ...prev, step: 'CONFIRMING', error: '煉成陣崩潰！請重試。' }));
@@ -183,7 +183,7 @@ const App: React.FC = () => {
           <Sparkles className="text-white w-9 h-9" />
         </div>
         <h1 className="text-4xl md:text-5xl font-magic font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
-          冰箱煉金術師
+          食材煉金術
         </h1>
         <p className="mt-2 text-slate-400 font-medium">Fridge Alchemist: Turning leftovers into pure gold.</p>
       </header>

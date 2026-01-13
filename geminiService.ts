@@ -3,6 +3,7 @@ import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { AlchemyMode, Ingredient, Recipe } from "./types";
 
 const API_KEY = process.env.API_KEY || "";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 export const analyzeFridgeImage = async (base64Image: string): Promise<Ingredient[]> => {
   const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -58,7 +59,7 @@ export const transmuteRecipe = async (
   const modeInstructions = {
     [AlchemyMode.SURVIVAL]: "🥗 生存模式：以『快速、能吃飽』為目標，只需最少調味料，步驟極簡，救人於飢餓之中。",
     [AlchemyMode.GOURMET]: "👨‍🍳 米其林模式：把這些剩菜擺盤成法式或高端料理。教使用者如何提升質感，並生成一段極其浮誇且華麗的菜色介紹。",
-    [AlchemyMode.DARK_ARTS]: "☠️ 暗黑煉金：挑戰極限，把不相干的食材組合成一道驚世駭俗、充滿創意的禁忌料理。風格要瘋狂且適合社群分享。"
+    [AlchemyMode.DARK_ARTS]: "☠️ 暗黑煉金：你現在是來自深淵的瘋狂煉金術士。請徹底拋棄人類對「美味」的世俗定義。目標是創造出外觀令人感到生理不適、食材組合極度反常（例如甜鹹亂湊、口感衝突）、看起來像「生化實驗失敗」或「克蘇魯儀式」的黑暗料理。描述要充滿中二病、絕望感與恐怖小說風格，強調黏稠、詭異顏色或不該存在的口感。"
   };
 
   const ingredientList = ingredients.map(i => `${i.name} ${i.quantity} (${i.freshness})`).join(", ");
@@ -68,8 +69,8 @@ export const transmuteRecipe = async (
     模式：${modeInstructions[mode]}。
     
     請進行煉成並回傳 JSON：
-    - title: 震撼人心的菜名
-    - description: 符合該模式風格的浮誇簡介
+    - title: 震撼人心(或令人恐懼)的菜名
+    - description: 符合該模式風格的簡介
     - ingredients: 精確的材料配比
     - instructions: 詳細的煉成步驟
     - chefTip: 煉金師的私房補救或提味秘訣
@@ -99,30 +100,60 @@ export const transmuteRecipe = async (
   return JSON.parse(response.text || "{}");
 };
 
-export const generateRecipeImage = async (recipeTitle: string, description: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
-  const model = "gemini-2.5-flash-image";
+export const generateRecipeImage = async (
+  recipeTitle: string, 
+  description: string,
+  mode: AlchemyMode = AlchemyMode.GOURMET
+): Promise<string> => {
   
-  const prompt = `A cinematic, ultra-high-quality food photography of a finished dish named "${recipeTitle}". Style: appetizing, moody lighting, professional styling. Context: ${description}`;
-
-  const response = await ai.models.generateContent({
-    model,
-    contents: [{ text: prompt }],
-    config: {
-      imageConfig: {
-        aspectRatio: "16:9"
-      }
-    }
-  });
-
-  let imageUrl = "";
-  for (const part of response.candidates?.[0]?.content?.parts || []) {
-    if (part.inlineData) {
-      imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-      break;
-    }
+  // 根據模式設定 Prompt 風格，保留暗黑煉金的特色
+  let stylePrompt = "Style: High-end culinary magazine, 8k resolution, delicious, dramatic lighting.";
+  
+  if (mode === AlchemyMode.DARK_ARTS) {
+    stylePrompt = "Style: Hyper-realistic biological horror food photography. Visceral, slimy, neon toxic lighting. Eldritch aesthetic. Looks unsettling and gross but high quality.";
+  } else if (mode === AlchemyMode.SURVIVAL) {
+    stylePrompt = "Style: Documentary style, messy home cooking, warm lighting, realistic textures, comfort food.";
   }
-  return imageUrl;
+
+  const prompt = `A professional food photography of "${recipeTitle}". Context: ${description}. ${stylePrompt}`;
+
+  try {
+    console.log("Generating image with OpenAI DALL-E 3...");
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "dall-e-3",
+        prompt: prompt,
+        n: 1,
+        size: "1024x1024",
+        response_format: "b64_json",
+        quality: "hd",
+        style: "vivid"
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error("OpenAI Error:", data.error);
+      // 如果 OpenAI 失敗 (例如 Key 設定錯誤)，為了不讓 App 壞掉，回傳空字串或考慮 fallback
+      return "";
+    }
+
+    if (data.data && data.data[0] && data.data[0].b64_json) {
+       return `data:image/png;base64,${data.data[0].b64_json}`;
+    }
+    
+    return "";
+
+  } catch (error) {
+    console.error("Image Gen Error:", error);
+    return ""; 
+  }
 };
 
 export const askChefQuestion = async (
